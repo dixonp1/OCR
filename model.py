@@ -21,15 +21,18 @@ def pool(x):
 
 def create_classifier(input, settings, keep_prob=1.0, training=False):
     ""
+    # normalize
+    mean, variance = tf.nn.moments(input, axes=[0, 1, 2], keep_dims=True)
+    norm_input = (input - mean) / tf.sqrt(variance)
 
     '''   Convolution Layer 1   '''
     w, h, c, nf = settings['conv1']
     W1, b1 = initialzie_weights([w, h, c, nf])
     with tf.name_scope('conv1'):
-        conv1 = conv(input, W1)
+        conv1 = conv(norm_input, W1)
         relu1 = tf.nn.leaky_relu(conv1)
         bn1 = tf.layers.batch_normalization(relu1, axis=3, training=training)
-        pool1 = pool(bn1)
+        pool1 = pool(relu1)
 
     '''   Convolution Layer 2   '''
     w, h, c, nf = settings['conv2']
@@ -38,7 +41,7 @@ def create_classifier(input, settings, keep_prob=1.0, training=False):
         conv2 = conv(pool1, W2)
         relu2 = tf.nn.leaky_relu(conv2)
         bn2 = tf.layers.batch_normalization(relu2, axis=3, training=training)
-        pool2 = pool(bn2)
+        pool2 = pool(relu2)
 
     '''   Convolution Layer 3   '''
     w, h, c, nf = settings['conv3']
@@ -48,28 +51,40 @@ def create_classifier(input, settings, keep_prob=1.0, training=False):
         relu3 = tf.nn.leaky_relu(conv3)
         bn3 = tf.layers.batch_normalization(relu3, axis=3, training=training)
 
+    """
+    '''   Convolution Layer 4   '''
+    w, h, c, nf = settings['conv4']
+    W4, b4 = initialzie_weights([w, h, c, nf])
+    with tf.name_scope('conv4'):
+        conv4 = conv(relu3, W4)
+        relu4 = tf.nn.leaky_relu(conv4)
+        bn4 = tf.layers.batch_normalization(relu4, axis=3, training=training)
+    """
+
     '''   Flatten   '''
     w, h, nf = settings['flat']
-    flatten = tf.reshape(bn3, [-1, w*h*nf])
+    flatten = tf.reshape(relu3, [-1, w*h*nf])
 
     '''   Fully Connected Layer 1   '''
     n_out1 = settings['full1'][0]
     W3, b3 = initialzie_weights([w*h*nf, n_out1])
     with tf.name_scope('full1'):
         full1 = tf.matmul(flatten, W3)
-        relu3 = tf.nn.leaky_relu(full1 + b3)
+        relu_full = tf.nn.leaky_relu(full1 + b3)
 
     '''   Dropout   '''
     if training != False:
-        dropout = tf.nn.dropout(relu3, keep_prob=keep_prob)
+        dropout = tf.nn.dropout(relu_full, keep_prob=keep_prob)
     else:
-        dropout = relu3
+        dropout = relu_full
 
     '''   Fully Connected Layer 2   '''
     n_out2 = settings['full2'][0]
-    W4, b4 = initialzie_weights([w*h*nf, n_out2])
+    #W4, b4 = initialzie_weights([w*h*nf, n_out2])
+    W4 = tf.Variable(tf.zeros([n_out1, n_out2]))
+    b4 = tf.Variable(tf.zeros([n_out2]))
     with tf.name_scope('full2'):
-        full2 = tf.matmul(flatten, W4)
+        full2 = tf.matmul(dropout, W4)
         z = full2 + b4
 
     '''   Softmax   '''

@@ -5,7 +5,7 @@ import random
 import model
 
 from scipy import io
-np.set_printoptions(linewidth=200, threshold=np.nan)
+np.set_printoptions(linewidth=150, threshold=np.nan)
 
 
 CLASSES = 26
@@ -98,26 +98,45 @@ def build_conf_matrix(y_, labels, conf_matrix):
     return conf_matrix
 
 
-def calc_metrics(conf_matrix):
-    pass
+def calc_metrics(conf_matrix, epsilon=1e-12):
+    tp_idx = np.arange(CLASSES)
+
+    conf_copy = np.copy(conf_matrix)
+    conf_copy[tp_idx, tp_idx] = 0
+
+    t_p = conf_matrix[tp_idx, tp_idx]
+    f_p = np.sum(conf_copy, axis=1)
+    f_n = np.sum(conf_copy, axis=0)
+
+    precision = t_p / (t_p + f_p + epsilon)
+    recall = t_p / (t_p + f_n + epsilon)
+
+    f1 = (2 * precision * recall) / (precision + recall + epsilon)
+
+    acc = np.sum(t_p) / np.sum(conf_matrix)
+
+    return precision, recall, f1, acc
+
 
 data_dir = os.path.join('data', 'emnist-letters')
 
 dataset = extract_data(data_dir)
 
-settings = {'conv1': [5, 5, 1, 8],     # output 14x14x16
-            'conv2': [5, 5, 8, 16],    # output 7x7x32
+settings = {'conv1': [3, 3, 1, 8],     # output 14x14x16
+            'conv2': [3, 3, 8, 16],    # output 7x7x32
             'conv3': [3, 3, 16, 32],    # output 7x7x128
+            #'conv4': [3, 3, 2, 2],
             'flat':  [7, 7, 32],
-            'full1': [512],
+            'full1': [2048],
             'full2': [CLASSES]}
 
 batch_size = 32
-epochs = 30
+epochs = 15
 learning_rate = 0.001
 steps = [5, 10, 15, 30]
 scale = [0.1, 0.5, 0.1, 0.5]
 momentum = 0.9
+dropout_prob = 1.0
 
 
 input_placeholder = tf.placeholder(tf.float32, shape=[None, 28, 28, 1])
@@ -176,7 +195,7 @@ with tf.Session() as sess:
                                                                                train_placeholder: False,
                                                                                keep_prob_placeholder: 1.0,
                                                                                label_placeholder: v_labels})
-            print('\nepoch: %d validation accuracy: %g\tloss: %g' % (e, v_accuracy, loss))
+            print('validation accuracy: %g\tloss: %g' % (v_accuracy, loss))
             c_val_batch += 1
 
         train_imgs, train_labels = shuffle_data(train_imgs, train_labels)
@@ -192,11 +211,12 @@ with tf.Session() as sess:
             t_labels = train_labels[start:end]
             train_step.run(feed_dict={input_placeholder: t_batch,
                                       train_placeholder: True,
-                                      keep_prob_placeholder: 0.5,
+                                      keep_prob_placeholder: dropout_prob,
                                       label_placeholder: t_labels,
                                       lr_placeholder: learning_rate})
             print('\rtraining batch: %d/%d' % (b, num_train_batches), end='')
 
+    print('\nevaluating against test set..')
     num_test_iters = int(test_imgs.shape[0] / 10)
     test_accuracy = 0
     conf_matrix = np.zeros((CLASSES, CLASSES), dtype=np.int32)
@@ -210,12 +230,34 @@ with tf.Session() as sess:
                                                                    keep_prob_placeholder: 1.0,
                                                                    label_placeholder: t_labels})
 
-        test_accuracy += t_correct
+        #test_accuracy += t_correct
         conf_matrix = build_conf_matrix(y_, t_labels, conf_matrix)
 
-    test_accuracy /= float(num_test_iters * 10)
-    print('\ntest accuracy: %g' % test_accuracy)
+    #test_accuracy /= float(num_test_iters * 10)
+    #print('\ntest accuracy: %g' % test_accuracy)
+
+    print(conf_matrix)
+
+    precision, recall, f1, acc = calc_metrics(conf_matrix)
+    print('accuracy: %g' % acc)
+
+    print('precision:')
+    print('mean: %g\t min: %g[%d]\t max: %g[%d]'
+          % (np.mean(precision), np.amin(precision),
+             np.argmin(precision), np.amax(precision), np.argmax(precision)))
+    print(precision)
+    print('recall:')
+    print('mean: %g\t min: %g[%d]\t max: %g[%d]'
+          % (np.mean(recall), np.amin(recall),
+             np.argmin(recall), np.amax(recall), np.argmax(recall)))
+    print(recall)
+    print('f1:')
+    print('mean: %g\t min: %g[%d]\t max: %g[%d]'
+          % (np.mean(f1), np.amin(f1),
+             np.argmin(f1), np.amax(f1), np.argmax(f1)))
+    print(f1)
+
+
     print('saving model..')
-    save_dir = os.path.join('saved_model', 'c_%g' % test_accuracy)
+    save_dir = os.path.join('saved_model', 'c_%g' % acc)
     saver.save(sess, save_dir)
-    #print(conf_matrix)
