@@ -30,10 +30,6 @@ def extract_data(data_file):
     train_data = train_data[:val_index]
     train_labels = train_labels[:val_index]
 
-    #train_data, train_labels = parse_nums(train_data, train_labels)
-    #val_data, val_labels = parse_nums(val_data, val_labels)
-    #test_data, test_labels = parse_nums(test_data, test_labels)
-
     train_labels = convert_to_one_hot(train_labels, CLASSES)
     val_labels = convert_to_one_hot(val_labels, CLASSES)
     test_labels = convert_to_one_hot(test_labels, CLASSES)
@@ -56,13 +52,6 @@ def convert_to_one_hot(labels, num_classes):
     new_labels = np.zeros((num_labels, num_classes))
     new_labels.flat[offset + labels.ravel()] = 1
     return new_labels
-
-
-def parse_nums(img, labels):
-    idx = (labels > 9).reshape(-1)
-    new_img = img[idx]
-    new_labels = labels[idx] - 10
-    return new_img, new_labels
 
 
 def shuffle_data(imgs, labels):
@@ -125,18 +114,17 @@ dataset = extract_data(data_dir)
 settings = {'conv1': [3, 3, 1, 8],     # output 14x14x16
             'conv2': [3, 3, 8, 16],    # output 7x7x32
             'conv3': [3, 3, 16, 32],    # output 7x7x128
-            #'conv4': [3, 3, 2, 2],
             'flat':  [7, 7, 32],
-            'full1': [2048],
+            'full1': [512],
             'full2': [CLASSES]}
 
 batch_size = 32
-epochs = 15
+epochs = 30
 learning_rate = 0.001
 steps = [5, 10, 15, 30]
 scale = [0.1, 0.5, 0.1, 0.5]
 momentum = 0.9
-dropout_prob = 1.0
+dropout_prob = 0.5
 
 
 input_placeholder = tf.placeholder(tf.float32, shape=[None, 28, 28, 1])
@@ -182,7 +170,7 @@ with tf.Session() as sess:
     i = 0
     for e in range(epochs):
         print('\nepoch: %d/%d' % (e, epochs))
-        if e % 1 == 0:
+        if e % 10 == 0:
             if c_val_batch == 5:
                 c_val_batch = 0
                 val_imgs, val_labels = shuffle_data(val_imgs, val_labels)
@@ -230,11 +218,7 @@ with tf.Session() as sess:
                                                                    keep_prob_placeholder: 1.0,
                                                                    label_placeholder: t_labels})
 
-        #test_accuracy += t_correct
         conf_matrix = build_conf_matrix(y_, t_labels, conf_matrix)
-
-    #test_accuracy /= float(num_test_iters * 10)
-    #print('\ntest accuracy: %g' % test_accuracy)
 
     print(conf_matrix)
 

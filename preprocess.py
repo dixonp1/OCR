@@ -26,4 +26,6 @@ def segment(img):
     horizontal_hist = np.sum(img_ones, axis=1)
     vertical_hist = np.sum(img_ones, axis=0)
 
+    return horizontal_hist, vertical_hist
+
 

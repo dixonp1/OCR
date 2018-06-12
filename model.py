@@ -51,16 +51,6 @@ def create_classifier(input, settings, keep_prob=1.0, training=False):
         relu3 = tf.nn.leaky_relu(conv3)
         bn3 = tf.layers.batch_normalization(relu3, axis=3, training=training)
 
-    """
-    '''   Convolution Layer 4   '''
-    w, h, c, nf = settings['conv4']
-    W4, b4 = initialzie_weights([w, h, c, nf])
-    with tf.name_scope('conv4'):
-        conv4 = conv(relu3, W4)
-        relu4 = tf.nn.leaky_relu(conv4)
-        bn4 = tf.layers.batch_normalization(relu4, axis=3, training=training)
-    """
-
     '''   Flatten   '''
     w, h, nf = settings['flat']
     flatten = tf.reshape(relu3, [-1, w*h*nf])
@@ -80,9 +70,7 @@ def create_classifier(input, settings, keep_prob=1.0, training=False):
 
     '''   Fully Connected Layer 2   '''
     n_out2 = settings['full2'][0]
-    #W4, b4 = initialzie_weights([w*h*nf, n_out2])
-    W4 = tf.Variable(tf.zeros([n_out1, n_out2]))
-    b4 = tf.Variable(tf.zeros([n_out2]))
+    W4, b4 = initialzie_weights([n_out1, n_out2])
     with tf.name_scope('full2'):
         full2 = tf.matmul(dropout, W4)
         z = full2 + b4
@@ -92,8 +80,3 @@ def create_classifier(input, settings, keep_prob=1.0, training=False):
     prediction = z
 
     return prediction
-
-
-def load_model(sess, save_dir):
-    saver = tf.train.Saver
-    saver.restore(sess, save_dir)
